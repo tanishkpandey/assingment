@@ -1,33 +1,32 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
-import { FabricImage, Canvas, Textbox, Circle, Rect, Triangle, Polygon } from 'fabric'; // Import for latest version
+import { FabricImage, Canvas, Textbox, Circle, Rect, Triangle, Polygon } from 'fabric'; // Import latest Fabric.js
 
 const AddCaptionPage = () => {
-  const { id } = useParams(); // Get the image ID from the route
-  const canvasRef = useRef(null); // Canvas reference
-  const [canvas, setCanvas] = useState(null); // Fabric.js canvas instance
-  const [imageUrl, setImageUrl] = useState(null); // Store the image URL
-  const API_KEY = "46697526-a622015f37acfda96112752b6"; // Your Pixabay API key
+  const { id } = useParams(); 
+  const canvasRef = useRef(null); 
+  const [canvas, setCanvas] = useState(null); 
+  const [imageUrl, setImageUrl] = useState(null); 
+  const [objects, setObjects] = useState([]); // Store canvas objects for the layers panel
+  const API_KEY = "46697526-a622015f37acfda96112752b6"; 
 
   // Fetch image data based on ID
   useEffect(() => {
     const fetchImage = async () => {
-      const url = `https://pixabay.com/api/?key=${API_KEY}&id=${id}`; // Fetch image by ID
+      const url = `https://pixabay.com/api/?key=${API_KEY}&id=${id}`;
       try {
         const response = await fetch(url);
         const data = await response.json();
-        
         if (data.hits.length > 0) {
-          const image = data.hits[0]; // Get the first result
-          setImageUrl(image.largeImageURL); // Set the image URL to be used for the canvas
+          const image = data.hits[0];
+          setImageUrl(image.largeImageURL);
         } else {
           console.error("Image not found");
         }
       } catch (error) {
-        console.error("Error fetching image:", error); // DEBUG: Log any fetch errors
+        console.error("Error fetching image:", error);
       }
     };
-
     fetchImage();
   }, [id]);
 
@@ -40,7 +39,7 @@ const AddCaptionPage = () => {
     setCanvas(fabricCanvas);
 
     return () => {
-      fabricCanvas.dispose(); // Cleanup on component unmount
+      fabricCanvas.dispose();
     };
   }, []);
 
@@ -48,42 +47,29 @@ const AddCaptionPage = () => {
   useEffect(() => {
     const loadImage = async () => {
       if (imageUrl && canvas) {
-        // Clear any existing content on the canvas
         canvas.clear();
-
         try {
-          // Load image using promise-based API with crossOrigin
           const img = await FabricImage.fromURL(imageUrl, { crossOrigin: "anonymous" });
-
-          // Scale image while keeping aspect ratio
-          const maxWidth = 500; // Set desired width for the image
-          const maxHeight = 500; // Set desired height for the image
-
-          if (img.width > img.height) {
-            img.scaleToWidth(maxWidth); // Scale the width and maintain aspect ratio
-          } else {
-            img.scaleToHeight(maxHeight); // Scale the height and maintain aspect ratio
-          }
-
-          // Set image position
-          img.set({
-            left: 50,
-            top: 50,
-            selectable: true,
-          });
-
-          // Add the image to the canvas and render it
+          img.scaleToWidth(500);
+          img.set({ left: 50, top: 50, selectable: true });
           canvas.add(img);
           canvas.setActiveObject(img);
           canvas.renderAll();
+          updateLayersPanel(); // Update layers after image is added
         } catch (error) {
           console.error("Error loading image: ", error);
         }
       }
     };
-
-    loadImage(); // Call the image loader function
+    loadImage();
   }, [imageUrl, canvas]);
+
+  // Function to update the layers panel
+  const updateLayersPanel = () => {
+    if (canvas) {
+      setObjects(canvas.getObjects()); // Update object list
+    }
+  };
 
   // Function to add a text layer to the canvas
   const addTextLayer = () => {
@@ -97,11 +83,10 @@ const AddCaptionPage = () => {
         editable: true,
         selectable: true,
       });
-
-      // Add the textbox to the canvas
       canvas.add(textbox);
-      canvas.setActiveObject(textbox); // Set it as active object
-      canvas.renderAll(); // Re-render the canvas
+      canvas.setActiveObject(textbox);
+      canvas.renderAll();
+      updateLayersPanel();
     }
   };
 
@@ -115,11 +100,10 @@ const AddCaptionPage = () => {
         fill: 'blue',
         selectable: true,
       });
-
-      // Add the circle to the canvas
       canvas.add(circle);
       canvas.setActiveObject(circle);
       canvas.renderAll();
+      updateLayersPanel();
     }
   };
 
@@ -134,11 +118,10 @@ const AddCaptionPage = () => {
         height: 60,
         selectable: true,
       });
-
-      // Add the rectangle to the canvas
       canvas.add(rectangle);
       canvas.setActiveObject(rectangle);
       canvas.renderAll();
+      updateLayersPanel();
     }
   };
 
@@ -153,11 +136,10 @@ const AddCaptionPage = () => {
         height: 100,
         selectable: true,
       });
-
-      // Add the triangle to the canvas
       canvas.add(triangle);
       canvas.setActiveObject(triangle);
       canvas.renderAll();
+      updateLayersPanel();
     }
   };
 
@@ -178,22 +160,31 @@ const AddCaptionPage = () => {
         fill: 'red',
         selectable: true,
       });
-
-      // Add the polygon to the canvas
       canvas.add(polygon);
       canvas.setActiveObject(polygon);
       canvas.renderAll();
+      updateLayersPanel();
     }
+  };
+
+  // Function to reorder layers based on new order
+  const handleLayerReorder = (dragIndex, hoverIndex) => {
+    const newObjects = [...objects];
+    const [draggedObject] = newObjects.splice(dragIndex, 1); // Remove dragged item
+    newObjects.splice(hoverIndex, 0, draggedObject); // Insert it in new position
+    newObjects.forEach((obj, index) => canvas.moveTo(obj, index)); // Update z-indexes
+    setObjects(newObjects); // Update state
+    canvas.renderAll(); // Re-render canvas
   };
 
   // Function to download the canvas content as an image
   const downloadImage = () => {
     if (canvas) {
-      const dataURL = canvas.toDataURL("image/png"); // Convert the canvas to a PNG data URL
+      const dataURL = canvas.toDataURL("image/png");
       const link = document.createElement("a");
       link.href = dataURL;
-      link.download = "canvas_image.png"; // Set the filename for the download
-      link.click(); // Programmatically trigger the download
+      link.download = "canvas_image.png";
+      link.click();
     }
   };
 
@@ -204,15 +195,28 @@ const AddCaptionPage = () => {
         <div>
           <canvas ref={canvasRef} style={{ border: "1px solid black" }} />
         </div>
+        <div style={{ marginLeft: "20px" }}>
+          <h3>Layers Panel</h3>
+          <ul>
+            {objects.map((obj, index) => (
+              <li key={index}>
+                <div draggable 
+                  onDragStart={(e) => e.dataTransfer.setData("dragIndex", index)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => handleLayerReorder(parseInt(e.dataTransfer.getData("dragIndex")), index)}>
+                  {obj.type} (Layer {index + 1})
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
       <div style={{ marginTop: "20px" }}>
-        {/* Add Shape Buttons */}
         <button onClick={addTextLayer}>Add Text</button>
         <button onClick={addCircle} style={{ marginLeft: "10px" }}>Add Circle</button>
         <button onClick={addRectangle} style={{ marginLeft: "10px" }}>Add Rectangle</button>
         <button onClick={addTriangle} style={{ marginLeft: "10px" }}>Add Triangle</button>
         <button onClick={addPolygon} style={{ marginLeft: "10px" }}>Add Polygon</button>
-        {/* Download Button */}
         <button onClick={downloadImage} style={{ marginLeft: "10px" }}>Download Image</button>
       </div>
     </div>
