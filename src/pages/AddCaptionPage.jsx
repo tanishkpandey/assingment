@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
-import { FabricImage, Canvas, Textbox, Circle, Rect, Triangle, Polygon } from 'fabric'; // Import latest Fabric.js
+import { FabricImage, Canvas, Textbox, Circle, Rect, Triangle, Polygon } from 'fabric'; 
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'; // Import DnD components
 
 const AddCaptionPage = () => {
   const { id } = useParams(); 
   const canvasRef = useRef(null); 
   const [canvas, setCanvas] = useState(null); 
   const [imageUrl, setImageUrl] = useState(null); 
-  const [objects, setObjects] = useState([]); // Store canvas objects for the layers panel
+  const [objects, setObjects] = useState([]); 
   const API_KEY = "46697526-a622015f37acfda96112752b6"; 
 
   // Fetch image data based on ID
@@ -167,13 +168,17 @@ const AddCaptionPage = () => {
     }
   };
 
-  // Function to reorder layers based on new order
-  const handleLayerReorder = (dragIndex, hoverIndex) => {
-    const newObjects = [...objects];
-    const [draggedObject] = newObjects.splice(dragIndex, 1); // Remove dragged item
-    newObjects.splice(hoverIndex, 0, draggedObject); // Insert it in new position
-    newObjects.forEach((obj, index) => canvas.moveTo(obj, index)); // Update z-indexes
-    setObjects(newObjects); // Update state
+  // Function to reorder layers based on new order from drag-and-drop
+  const onDragEnd = (result) => {
+    const { source, destination } = result;
+    if (!destination) return;
+
+    const reorderedObjects = Array.from(objects);
+    const [draggedObject] = reorderedObjects.splice(source.index, 1); // Remove dragged item
+    reorderedObjects.splice(destination.index, 0, draggedObject); // Insert at new position
+
+    reorderedObjects.forEach((obj, index) => canvas.moveTo(obj, index)); // Update z-indexes
+    setObjects(reorderedObjects); // Update state
     canvas.renderAll(); // Re-render canvas
   };
 
@@ -197,18 +202,35 @@ const AddCaptionPage = () => {
         </div>
         <div style={{ marginLeft: "20px" }}>
           <h3>Layers Panel</h3>
-          <ul>
-            {objects.map((obj, index) => (
-              <li key={index}>
-                <div draggable 
-                  onDragStart={(e) => e.dataTransfer.setData("dragIndex", index)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => handleLayerReorder(parseInt(e.dataTransfer.getData("dragIndex")), index)}>
-                  {obj.type} (Layer {index + 1})
-                </div>
-              </li>
-            ))}
-          </ul>
+          <DragDropContext onDragEnd={onDragEnd}>
+            <Droppable droppableId="droppable-layers">
+              {(provided) => (
+                <ul {...provided.droppableProps} ref={provided.innerRef}>
+                  {objects.map((obj, index) => (
+                    <Draggable key={index} draggableId={index.toString()} index={index}>
+                      {(provided) => (
+                        <li
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          style={{
+                            ...provided.draggableProps.style,
+                            padding: "10px",
+                            border: "1px solid lightgray",
+                            marginBottom: "5px",
+                            cursor: "move",
+                          }}
+                        >
+                          {obj.type} (Layer {index + 1})
+                        </li>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </ul>
+              )}
+            </Droppable>
+          </DragDropContext>
         </div>
       </div>
       <div style={{ marginTop: "20px" }}>
